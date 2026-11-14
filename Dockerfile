@@ -1,5 +1,5 @@
 # Сборка: TypeScript → JavaScript
-FROM node:22-slim AS build
+FROM node:25-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -8,7 +8,7 @@ COPY src src
 RUN npm run build && npm prune --omit=dev
 
 # Запуск: только собранный код и рабочие зависимости
-FROM node:22-slim
+FROM node:25-slim
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/node_modules node_modules
