@@ -6,7 +6,7 @@
 
 **Стек:** Node.js 22, TypeScript (strict), Fastify, PostgreSQL, Drizzle ORM, Zod, OpenAPI · **Тесты:** Vitest, fast-check · **Инфраструктура:** Docker, GitHub Actions
 
-Документация API с примерами — `http://localhost:3000/docs` после запуска. Демо-аккаунты: `organizer@kassa.kz` и `buyer@kassa.kz`, пароль `kassa-demo`. Тестовые карты: `tok_success` — оплата пройдёт, `tok_declined` — банк отклонит.
+**Работает онлайн:** [документация API — попробовать запросы прямо в браузере](https://kassa-api-419n.onrender.com/docs). Сервер на бесплатном хостинге засыпает после простоя, поэтому первый запрос может идти до минуты. Локально — `http://localhost:3000/docs`. Демо-аккаунты: `organizer@kassa.kz` и `buyer@kassa.kz`, пароль `kassa-demo`. Тестовые карты: `tok_success` — оплата пройдёт, `tok_declined` — банк отклонит.
 
 ## Как идёт покупка
 
