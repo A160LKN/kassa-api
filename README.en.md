@@ -53,9 +53,9 @@ sequenceDiagram
 | API         | 57                 | sign-in and rate limit, events and cursor pagination, holds, orders, payment: declined card and retry with another card, gateway down, late payment with refund, forged webhooks, event cancellation; **a real HTTP webhook** from the demo gateway                                      |
 | Smoke       | the whole purchase | the built Docker image in CI: sign in → hold → order → pay → webhook → `paid`                                                                                                                                                                                                            |
 
-Coverage is 98 % of lines; CI fails below 90 %. CI also checks that migrations match the schema.
+Coverage is 99 % of lines; CI fails below 90 %. CI also checks that migrations match the schema.
 
-**Reports from the latest run on `main`:** [Allure — all 92 tests by section](https://a160lkn.github.io/kassa-api/) · [code coverage by file](https://a160lkn.github.io/kassa-api/coverage/)
+**Reports from the latest run on `main`:** [Allure — all tests by section](https://a160lkn.github.io/kassa-api/) · [code coverage by file](https://a160lkn.github.io/kassa-api/coverage/)
 
 More detail (in Russian) in the [test documentation](docs/testing/README.md): test strategy with risk analysis, a coverage matrix of 20 features, smoke and regression checklists.
 
