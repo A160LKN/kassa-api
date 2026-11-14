@@ -1,0 +1,41 @@
+# API с базой одной командой: docker compose up --wait  →  http://localhost:3000/docs
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: kassa
+      POSTGRES_PASSWORD: kassa
+      POSTGRES_DB: kassa
+    ports:
+      - '5432:5432' # тесты с компьютера подключаются к этой же БД (база kassa_test)
+    volumes:
+      - ./scripts/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kassa']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://kassa:kassa@db:5432/kassa
+      JWT_SECRET: local-docker-secret-at-least-32-bytes
+      WEBHOOK_SECRET: local-docker-webhook-secret
+      SEED_DEMO: 'true'
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
