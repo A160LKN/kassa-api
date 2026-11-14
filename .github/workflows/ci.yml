@@ -36,8 +36,36 @@ jobs:
       - name: Миграции совпадают со схемой
         run: npx drizzle-kit generate --name ci-check && git diff --exit-code drizzle/
       - name: Тесты (юнит, гонки на PostgreSQL, API) с порогом покрытия
-        run: npm run test:coverage
+        run: npm run test:coverage -- --coverage.reporter=text --coverage.reporter=html
       - run: npm run build
+      - name: Собрать Allure-отчёт и положить рядом отчёт о покрытии
+        if: always()
+        run: |
+          npx --yes allure-commandline@2 generate allure-results --clean -o site
+          cp -r coverage site/coverage || true
+      - name: Подготовить отчёты к публикации на GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  report:
+    name: Опубликовать отчёты на GitHub Pages
+    needs: test
+    if: always() && github.ref == 'refs/heads/main' && needs.test.result != 'skipped'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
 
   docker:
     name: Docker-образ — сборка и смоук всего сценария покупки

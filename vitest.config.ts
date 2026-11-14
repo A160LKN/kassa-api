@@ -4,7 +4,9 @@ export default defineConfig({
   test: {
     globals: true,
     globalSetup: ['./tests/global-setup.ts'],
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/setup.ts', 'allure-vitest/setup'],
+    // Allure-отчёт публикуется на GitHub Pages после каждого прогона в main
+    reporters: ['default', ['allure-vitest/reporter', { resultsDir: 'allure-results' }]],
     // Тесты делят одну базу: файлы идут по очереди, а внутри файла — параллельные запросы там, где проверяется гонка
     fileParallelism: false,
     testTimeout: 15_000,
