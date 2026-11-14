@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/A160LKN/kassa-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/A160LKN/kassa-api/actions/workflows/ci.yml)
 
+**Русский** · [English](README.en.md)
+
 Бэкенд продажи билетов на мероприятия: схема зала, бронь мест на 10 минут, заказ и оплата через платёжный сервис с подписанным вебхуком. Предметная область, где ошибки стоят денег: одно место не должно продаться дважды, деньги не должны списаться дважды, а оплата после истечения брони должна вернуться покупателю.
 
 **Стек:** Node.js 22, TypeScript (strict), Fastify, PostgreSQL, Drizzle ORM, Zod, OpenAPI · **Тесты:** Vitest, fast-check · **Инфраструктура:** Docker, GitHub Actions
