@@ -14,6 +14,7 @@ export const config: Config = loadConfig({
   DATABASE_URL: TEST_DATABASE_URL,
   JWT_SECRET: 'test-secret-that-is-long-enough-32b',
   WEBHOOK_SECRET: 'test-webhook-secret',
+  REGISTRATIONS_PER_HOUR: '10000', // тесты регистрируют десятки пользователей с одного адреса
 });
 
 let pool: ReturnType<typeof createDb> | null = null;

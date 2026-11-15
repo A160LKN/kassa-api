@@ -44,16 +44,16 @@ sequenceDiagram
 - Password guessing is rate-limited (5 attempts per minute), someone else's order is `404`, not `403`, unknown request fields are an error rather than silently ignored, and every response carries `X-Request-Id` for log lookup. Settings are validated at startup: in production the server refuses to start with a default secret.
 - The demo payment gateway sends its webhook **over HTTP** to the API itself, the same way a real service would.
 
-## Tests — 92
+## Tests — 103
 
-| Level       | Tests              | What they check                                                                                                                                                                                                                                                                          |
-| ----------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit        | 27                 | all 25 "status × action" pairs; **fast-check**: across 2000 random action sequences money is never charged twice or refunded without payment; passwords, JWT (`alg=none`, expired, foreign secret), webhook signature (tampered body, foreign secret, replay after 10 minutes), settings |
-| Integration | 8                  | on PostgreSQL: **50 buyers hit one seat at the same time — exactly one gets it**; overlapping seat sets — all or nothing; 10 requests with one Idempotency-Key — one order; 5 identical webhooks at once — one payment; the sweep; the `CHECK` constraint                                |
-| API         | 57                 | sign-in and rate limit, events and cursor pagination, holds, orders, payment: declined card and retry with another card, gateway down, late payment with refund, forged webhooks, event cancellation; **a real HTTP webhook** from the demo gateway                                      |
-| Smoke       | the whole purchase | the built Docker image in CI: sign in → hold → order → pay → webhook → `paid`                                                                                                                                                                                                            |
+| Level       | Tests              | What they check                                                                                                                                                                                                                                                                                             |
+| ----------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | 27                 | all 25 "status × action" pairs; **fast-check**: across 2000 random action sequences money is never charged twice or refunded without payment; passwords, JWT (`alg=none`, expired, foreign secret), webhook signature (tampered body, foreign secret, replay after 10 minutes), settings                    |
+| Integration | 8                  | on PostgreSQL: **50 buyers hit one seat at the same time — exactly one gets it**; overlapping seat sets — all or nothing; 10 requests with one Idempotency-Key — one order; 5 identical webhooks at once — one payment; the sweep; the `CHECK` constraint                                                   |
+| API         | 68                 | security headers, weak passwords and the sign-up limit, sign-in and rate limit, events and cursor pagination, holds, orders, payment: declined card and retry with another card, gateway down, late payment with refund, forged webhooks, event cancellation; **a real HTTP webhook** from the demo gateway |
+| Smoke       | the whole purchase | the built Docker image in CI: sign in → hold → order → pay → webhook → `paid`                                                                                                                                                                                                                               |
 
-Coverage is 99 % of lines; CI fails below 90 %. CI also checks that migrations match the schema.
+Coverage is 96 % of lines; CI fails below 90 %. CI also checks that migrations match the schema.
 
 **Reports from the latest run on `main`:** [Allure — all tests by section](https://a160lkn.github.io/kassa-api/) · [code coverage by file](https://a160lkn.github.io/kassa-api/coverage/)
 

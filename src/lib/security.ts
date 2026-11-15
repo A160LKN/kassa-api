@@ -86,3 +86,34 @@ export function verifyWebhook(
     throw new AppError(400, 'bad_signature', 'Подпись вебхука не совпадает');
   }
 }
+
+// Самые частые пароли из утечек: их подбирают первыми
+const COMMON_PASSWORDS = new Set([
+  '12345678',
+  '123456789',
+  '1234567890',
+  'password',
+  'password1',
+  'qwerty123',
+  'qwertyuiop',
+  '11111111',
+  '00000000',
+  'iloveyou',
+  '12341234',
+  '87654321',
+  'qwerty12',
+  '1q2w3e4r',
+  'abc12345',
+]);
+
+/** Популярный, однообразный (меньше 4 разных символов) или совпадающий с email пароль. */
+export function isWeakPassword(password: string, email: string): boolean {
+  const lowered = password.toLowerCase();
+  const name = email.toLowerCase().split('@')[0] ?? '';
+  return (
+    COMMON_PASSWORDS.has(lowered) ||
+    new Set(password).size < 4 ||
+    lowered === email.toLowerCase() ||
+    lowered === name
+  );
+}

@@ -20,6 +20,7 @@ import { AppError } from './lib/errors.js';
 import {
   createToken,
   hashPassword,
+  isWeakPassword,
   readToken,
   verifyPassword,
   verifyWebhook,
@@ -110,8 +111,22 @@ export async function buildApp({ config, db, gateway }: Deps) {
     }
   });
 
+  // Заголовки безопасности на каждом ответе. API отдаёт только JSON — ему не нужны ни скрипты, ни стили;
+  // страница /docs (Swagger UI) получает свою, более мягкую политику
   app.addHook('onSend', (request, reply, _payload, done) => {
-    void reply.header('X-Request-Id', request.id);
+    const docs = request.url.startsWith('/docs');
+    void reply.headers({
+      'X-Request-Id': request.id,
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'no-referrer',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      'Content-Security-Policy': docs
+        ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
+        : "default-src 'none'; frame-ancestors 'none'",
+    });
     done();
   });
 
@@ -136,7 +151,10 @@ export async function buildApp({ config, db, gateway }: Deps) {
       return reply.status(status).send({ error: { code: 'bad_request', message: (error as Error).message } });
     }
     request.log.error(error);
-    return reply.status(500).send({ error: { code: 'internal', message: 'Внутренняя ошибка сервера' } });
+    // Подробности — только в журнал; клиент получает код и ID, по которому ошибку можно найти
+    return reply
+      .status(500)
+      .send({ error: { code: 'internal', message: 'Внутренняя ошибка сервера', request_id: request.id } });
   });
 
   // ---------- Авторизация ----------
@@ -194,6 +212,8 @@ export async function buildApp({ config, db, gateway }: Deps) {
   app.post(
     '/auth/register',
     {
+      // Регистрации с одного адреса ограничены: защита от спама аккаунтами
+      config: { rateLimit: { max: config.REGISTRATIONS_PER_HOUR, timeWindow: '1 hour' } },
       schema: {
         tags: ['Вход'],
         body: z.strictObject({
@@ -202,11 +222,18 @@ export async function buildApp({ config, db, gateway }: Deps) {
           password: z.string().min(8).max(128),
           role: z.enum(['organizer', 'customer']).default('customer'),
         }),
-        response: { 201: TokenOut, 409: ErrorOut },
+        response: { 201: TokenOut, 409: ErrorOut, 422: ErrorOut, 429: ErrorOut },
       },
     },
     async (request, reply) => {
       const { email, name, password, role: userRole } = request.body;
+      if (isWeakPassword(password, email)) {
+        throw new AppError(
+          422,
+          'weak_password',
+          'Слишком простой пароль: возьмите длиннее и не из популярных',
+        );
+      }
       const [user] = await db
         .insert(users)
         .values({ email, name, role: userRole, passwordHash: await hashPassword(password) })

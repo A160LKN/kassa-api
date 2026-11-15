@@ -24,6 +24,8 @@ const schema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  // Регистраций в час с одного адреса: защита от спама. В тестах и нагрузке — выше
+  REGISTRATIONS_PER_HOUR: z.coerce.number().int().positive().default(10),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'silent']).default('info'),
 });
 

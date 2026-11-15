@@ -30,6 +30,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Уязвимости в зависимостях (npm audit)
+        run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
