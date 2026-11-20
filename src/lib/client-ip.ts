@@ -5,7 +5,7 @@ import type { Config } from '../config.js';
 /**
  * Адрес клиента для лимитов.
  *
- * 1. CLIENT_IP_HEADER (на Render — true-client-ip): его ставит Cloudflare, клиент подделать не может.
+ * 1. CLIENT_IP_HEADER (на Render — cf-connecting-ip): его ставит Cloudflare и перезаписывает присланный клиентом.
  * 2. request.ip: Fastify с trustProxy = PROXY_HOPS берёт адрес на этой позиции справа в X-Forwarded-For —
  *    только эти записи дописали наши прокси. Без доверия к прокси это адрес соединения.
  */

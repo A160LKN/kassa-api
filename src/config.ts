@@ -29,7 +29,7 @@ const schema = z.object({
   // Сколько наших прокси дописывают адрес в конец X-Forwarded-For. Левые записи присылает сам клиент,
   // верить им нельзя. 0 — заголовку не доверяем. На Render: «…, клиент, Cloudflare» — 2
   PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
-  // Заголовок с адресом клиента от доверенного прокси: true-client-ip у Cloudflare (Render). Пусто — не используется
+  // Заголовок с адресом клиента от доверенного прокси: cf-connecting-ip у Cloudflare (Render). Пусто — не используется
   CLIENT_IP_HEADER: z
     .string()
     .regex(/^[a-z0-9-]*$/)
@@ -39,8 +39,17 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema>;
 
+/**
+ * Render сам задаёт каждому сервису RENDER=true. По нему включается доверие к прокси Render и Cloudflare —
+ * живой сайт не зависит от того, перенесены ли переменные из render.yaml в панель (у сервиса, созданного
+ * не через Blueprint, они не применяются). Явная переменная окружения по-прежнему важнее.
+ * cf-connecting-ip ставит Cloudflare на любом тарифе и перезаписывает, если клиент прислал свой.
+ */
+const renderDefaults = (env: NodeJS.ProcessEnv) =>
+  env.RENDER === 'true' ? { PROXY_HOPS: '2', CLIENT_IP_HEADER: 'cf-connecting-ip' } : {};
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const config = schema.parse(env);
+  const config = schema.parse({ ...renderDefaults(env), ...env });
   // Значения по умолчанию опубликованы в репозитории: с JWT_SECRET любой подпишет себе токен,
   // с WEBHOOK_SECRET — подделает вебхук «оплата прошла» и получит билеты бесплатно
   if (config.NODE_ENV === 'production' && config.JWT_SECRET.startsWith('dev-')) {

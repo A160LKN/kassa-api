@@ -127,6 +127,15 @@ describe('курсор и настройки', () => {
     expect(loadConfig({ NODE_ENV: 'production', ...secrets }).NODE_ENV).toBe('production');
   });
 
+  it('на Render доверие к прокси и Cloudflare включается само, явная переменная важнее', () => {
+    expect(loadConfig({ RENDER: 'true' })).toMatchObject({
+      PROXY_HOPS: 2,
+      CLIENT_IP_HEADER: 'cf-connecting-ip',
+    });
+    expect(loadConfig({ RENDER: 'true', PROXY_HOPS: '3' }).PROXY_HOPS).toBe(3);
+    expect(loadConfig({})).toMatchObject({ PROXY_HOPS: 0, CLIENT_IP_HEADER: '' });
+  });
+
   it('неверные значения настроек — ошибка при старте', () => {
     expect(() => loadConfig({ PORT: 'abc' })).toThrow();
     expect(() => loadConfig({ JWT_SECRET: 'short' })).toThrow();
