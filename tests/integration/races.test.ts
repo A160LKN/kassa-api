@@ -2,6 +2,7 @@
  * Гонки на настоящем PostgreSQL: такие ошибки не видны ни руками, ни в последовательных тестах —
  * только когда запросы приходят одновременно.
  */
+import { createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { idempotencyKeys, orders, seats } from '../../src/db/schema.js';
 import { holdSeats } from '../../src/modules/seats.js';
@@ -107,10 +108,13 @@ it('брошенный ключ (процесс упал посреди запр
     replayed: false,
   });
 
-  // Свежий ключ без ответа — запрос ещё идёт: повтор честно получает 409
+  // Свежий ключ без ответа — тот же запрос ещё идёт: повтор честно получает 409
+  const sameRequest = createHash('sha256')
+    .update(JSON.stringify({ a: 1 }))
+    .digest('hex');
   await ctx.db
     .insert(idempotencyKeys)
-    .values({ userId: buyer.id, key: 'running-key', requestHash: 'x'.repeat(64) });
+    .values({ userId: buyer.id, key: 'running-key', requestHash: sameRequest });
   await expect(idempotent(ctx.db, buyer.id, 'running-key', { a: 1 }, action)).rejects.toMatchObject({
     code: 'idempotency_in_progress',
   });
