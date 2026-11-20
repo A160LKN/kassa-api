@@ -119,8 +119,12 @@ describe('курсор и настройки', () => {
   });
 
   it('в production нельзя оставить секрет по умолчанию', () => {
+    const secrets = { JWT_SECRET: 'x'.repeat(40), WEBHOOK_SECRET: 'w'.repeat(32) };
     expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/JWT_SECRET/);
-    expect(loadConfig({ NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(40) }).NODE_ENV).toBe('production');
+    expect(() => loadConfig({ NODE_ENV: 'production', JWT_SECRET: secrets.JWT_SECRET })).toThrow(
+      /WEBHOOK_SECRET/,
+    );
+    expect(loadConfig({ NODE_ENV: 'production', ...secrets }).NODE_ENV).toBe('production');
   });
 
   it('неверные значения настроек — ошибка при старте', () => {

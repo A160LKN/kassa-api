@@ -41,8 +41,13 @@ export type Config = z.infer<typeof schema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const config = schema.parse(env);
+  // Значения по умолчанию опубликованы в репозитории: с JWT_SECRET любой подпишет себе токен,
+  // с WEBHOOK_SECRET — подделает вебхук «оплата прошла» и получит билеты бесплатно
   if (config.NODE_ENV === 'production' && config.JWT_SECRET.startsWith('dev-')) {
     throw new Error('JWT_SECRET по умолчанию нельзя использовать в production');
+  }
+  if (config.NODE_ENV === 'production' && config.WEBHOOK_SECRET.startsWith('dev-')) {
+    throw new Error('WEBHOOK_SECRET по умолчанию нельзя использовать в production');
   }
   return config;
 }
