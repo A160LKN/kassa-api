@@ -2,11 +2,12 @@
  * Гонки на настоящем PostgreSQL: такие ошибки не видны ни руками, ни в последовательных тестах —
  * только когда запросы приходят одновременно.
  */
+import { createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-import { orders, seats } from '../../src/db/schema.js';
+import { idempotencyKeys, orders, seats } from '../../src/db/schema.js';
 import { holdSeats } from '../../src/modules/seats.js';
 import { createOrder, handlePaymentWebhook, sweep } from '../../src/modules/orders.js';
-import { idempotent } from '../../src/modules/idempotency.js';
+import { idempotent, sweepIdempotencyKeys } from '../../src/modules/idempotency.js';
 import { AppError } from '../../src/lib/errors.js';
 import { eventId, FakeGateway, makeApp, publishedEvent, register, type TestContext } from '../helpers.js';
 
@@ -90,6 +91,45 @@ it('один Idempotency-Key, 10 одновременных запросов —
   expect(created).toHaveLength(1);
   const errors = results.flatMap((r) => (r.status === 'rejected' ? [(r.reason as AppError).code] : []));
   expect(errors.every((code) => code === 'idempotency_in_progress')).toBe(true);
+});
+
+it('брошенный ключ (процесс упал посреди запроса) не блокирует повтор навсегда', async () => {
+  const buyer = await register(ctx.app);
+  const action = () => Promise.resolve({ status: 201, body: { ok: true } });
+  // Ключ занят, ответа нет: так выглядит запрос, процесс которого упал
+  await ctx.db.insert(idempotencyKeys).values({
+    userId: buyer.id,
+    key: 'crashed-key',
+    requestHash: 'x'.repeat(64),
+    createdAt: new Date(Date.now() - 5 * 60_000),
+  });
+  await expect(idempotent(ctx.db, buyer.id, 'crashed-key', { a: 1 }, action)).resolves.toMatchObject({
+    status: 201,
+    replayed: false,
+  });
+
+  // Свежий ключ без ответа — тот же запрос ещё идёт: повтор честно получает 409
+  const sameRequest = createHash('sha256')
+    .update(JSON.stringify({ a: 1 }))
+    .digest('hex');
+  await ctx.db
+    .insert(idempotencyKeys)
+    .values({ userId: buyer.id, key: 'running-key', requestHash: sameRequest });
+  await expect(idempotent(ctx.db, buyer.id, 'running-key', { a: 1 }, action)).rejects.toMatchObject({
+    code: 'idempotency_in_progress',
+  });
+});
+
+it('уборка удаляет ключи старше суток и оставляет свежие', async () => {
+  const buyer = await register(ctx.app);
+  const old = new Date(Date.now() - 25 * 3600_000);
+  await ctx.db.insert(idempotencyKeys).values([
+    { userId: buyer.id, key: 'old', requestHash: 'x'.repeat(64), statusCode: 201, createdAt: old },
+    { userId: buyer.id, key: 'fresh', requestHash: 'x'.repeat(64), statusCode: 201 },
+  ]);
+  expect(await sweepIdempotencyKeys(ctx.db)).toBeGreaterThanOrEqual(1);
+  const left = await ctx.db.select().from(idempotencyKeys).where(eq(idempotencyKeys.userId, buyer.id));
+  expect(left.map((k) => k.key)).toEqual(['fresh']);
 });
 
 it('вебхук пришёл 5 раз одновременно — заказ оплачивается один раз', async () => {

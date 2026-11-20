@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { idempotencyKeys } from '../db/schema.js';
 import { AppError } from '../lib/errors.js';
@@ -9,6 +9,15 @@ export interface Stored {
   body: unknown;
   replayed: boolean;
 }
+
+/**
+ * Ключ «в работе» дольше этого считается брошенным: процесс упал между захватом ключа и записью ответа.
+ * Без этого ключ навсегда отвечал бы 409 «запрос ещё выполняется», и повторить запрос было бы нельзя.
+ * С запасом больше любого запроса: самый долгий — оплата, а шлюз отвечает за секунды.
+ */
+export const ABANDONED_AFTER_SECONDS = 60;
+/** Сохранённый ответ нужен для повторов после обрыва связи — сутки с запасом хватает. */
+export const KEEP_HOURS = 24;
 
 /**
  * Idempotency-Key: клиент повторил запрос (обрыв связи, двойной клик) — получает тот же ответ,
@@ -25,12 +34,25 @@ export async function idempotent(
 ): Promise<Stored> {
   if (key === undefined) return { ...(await action()), replayed: false };
   const requestHash = createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');
-  const claimed = await db
-    .insert(idempotencyKeys)
-    .values({ userId, key, requestHash })
-    .onConflictDoNothing()
-    .returning();
   const where = and(eq(idempotencyKeys.userId, userId), eq(idempotencyKeys.key, key));
+  const claim = () =>
+    db.insert(idempotencyKeys).values({ userId, key, requestHash }).onConflictDoNothing().returning();
+  let claimed = await claim();
+  if (claimed.length === 0) {
+    // Брошенный ключ освобождаем и занимаем заново. Удаление атомарно: из двух одновременных повторов
+    // ключ достанется одному, второй получит обычный ответ «запрос ещё выполняется»
+    const abandoned = await db
+      .delete(idempotencyKeys)
+      .where(
+        and(
+          where,
+          isNull(idempotencyKeys.statusCode),
+          lt(idempotencyKeys.createdAt, sql`now() - make_interval(secs => ${ABANDONED_AFTER_SECONDS})`),
+        ),
+      )
+      .returning();
+    if (abandoned.length > 0) claimed = await claim();
+  }
 
   if (claimed.length === 0) {
     const existing = await db.query.idempotencyKeys.findFirst({ where });
@@ -66,3 +88,12 @@ export async function idempotent(
 export const errorBody = (error: AppError) => ({
   error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) },
 });
+
+/** Старые ключи больше не нужны: таблица не растёт бесконечно. Возвращает, сколько удалено. */
+export async function sweepIdempotencyKeys(db: Database): Promise<number> {
+  const removed = await db
+    .delete(idempotencyKeys)
+    .where(lt(idempotencyKeys.createdAt, sql`now() - make_interval(hours => ${KEEP_HOURS})`))
+    .returning({ key: idempotencyKeys.key });
+  return removed.length;
+}
