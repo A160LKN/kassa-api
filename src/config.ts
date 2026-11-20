@@ -26,6 +26,14 @@ const schema = z.object({
     .transform((v) => v === 'true'),
   // Регистраций в час с одного адреса: защита от спама. В тестах и нагрузке — выше
   REGISTRATIONS_PER_HOUR: z.coerce.number().int().positive().default(10),
+  // Сколько наших прокси дописывают адрес в конец X-Forwarded-For. Левые записи присылает сам клиент,
+  // верить им нельзя. 0 — заголовку не доверяем. На Render: «…, клиент, Cloudflare» — 2
+  PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+  // Заголовок с адресом клиента от доверенного прокси: true-client-ip у Cloudflare (Render). Пусто — не используется
+  CLIENT_IP_HEADER: z
+    .string()
+    .regex(/^[a-z0-9-]*$/)
+    .default(''),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'silent']).default('info'),
 });
 

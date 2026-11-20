@@ -16,6 +16,7 @@ import type { Config } from './config.js';
 import type { Database } from './db/client.js';
 import { users } from './db/schema.js';
 import { TEST_CARDS, type PaymentGateway } from './gateway/gateway.js';
+import { clientIp } from './lib/client-ip.js';
 import { AppError } from './lib/errors.js';
 import {
   createToken,
@@ -71,7 +72,9 @@ export async function buildApp({ config, db, gateway }: Deps) {
     logger:
       config.NODE_ENV === 'test' ? false : { level: config.LOG_LEVEL, redact: ['req.headers.authorization'] },
     genReqId: () => crypto.randomUUID(),
-    trustProxy: true,
+    // Не true: тогда Fastify брал бы левый адрес X-Forwarded-For, который подделывает клиент.
+    // Доверяем только PROXY_HOPS ближайшим прокси (hop 0 — само соединение) — как числовой trustProxy
+    trustProxy: (_address: string, hop: number) => hop < config.PROXY_HOPS,
   }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
@@ -83,7 +86,7 @@ export async function buildApp({ config, db, gateway }: Deps) {
     allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     exposedHeaders: ['Idempotent-Replayed', 'X-Request-Id'],
   });
-  await app.register(rateLimit, { global: false });
+  await app.register(rateLimit, { global: false, keyGenerator: (request) => clientIp(request, config) });
   await app.register(swagger, {
     openapi: {
       info: {
@@ -260,7 +263,7 @@ export async function buildApp({ config, db, gateway }: Deps) {
           timeWindow: '1 minute',
           keyGenerator: (request) => {
             const email = (request.body as { email?: unknown } | undefined)?.email;
-            return `${request.ip}:${typeof email === 'string' ? email.toLowerCase() : ''}`;
+            return `${clientIp(request, config)}:${typeof email === 'string' ? email.toLowerCase() : ''}`;
           },
         },
       },

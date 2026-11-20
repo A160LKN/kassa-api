@@ -55,6 +55,36 @@ describe('безопасность', () => {
     expect(statuses).toEqual([201, 201, 201, 429]);
   });
 
+  it('подделанный левый адрес в X-Forwarded-For не обходит лимит регистраций', async () => {
+    // Как на Render: клиент сам дописывает слева новый «адрес», прокси — настоящий адрес и Cloudflare
+    ctx = await makeApp({ REGISTRATIONS_PER_HOUR: 3, PROXY_HOPS: 2 });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = await ctx.app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        headers: { 'x-forwarded-for': `6.6.${i}.6, 99.61.165.29, 104.22.17.40` },
+        payload: { email: `spoof${i}-${Date.now()}@test.kz`, name: 'S', password: PASSWORD },
+      });
+      statuses.push(r.statusCode);
+    }
+    expect(statuses).toEqual([201, 201, 201, 429]);
+  });
+
+  it('адрес из заголовка доверенного прокси разделяет клиентов', async () => {
+    ctx = await makeApp({ REGISTRATIONS_PER_HOUR: 1, CLIENT_IP_HEADER: 'true-client-ip' });
+    const reg = (ip: string, i: number) =>
+      ctx.app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        headers: { 'true-client-ip': ip },
+        payload: { email: `tci${i}-${Date.now()}@test.kz`, name: 'T', password: PASSWORD },
+      });
+    expect((await reg('99.61.165.29', 1)).statusCode).toBe(201);
+    expect((await reg('99.61.165.29', 2)).statusCode).toBe(429);
+    expect((await reg('99.61.165.30', 3)).statusCode).toBe(201);
+  });
+
   it('500 не раскрывает подробностей, но даёт ID запроса', async () => {
     // Маршрут, который падает, добавляется до запуска приложения
     const gateway = new FakeGateway();

@@ -16,3 +16,9 @@ services:
         generateValue: true
       - key: SEED_DEMO
         value: 'true'
+      # Адрес клиента для лимитов (src/lib/client-ip.ts). Render стоит за Cloudflare:
+      # True-Client-IP ставит Cloudflare, X-Forwarded-For — «…, клиент, Cloudflare»
+      - key: CLIENT_IP_HEADER
+        value: true-client-ip
+      - key: PROXY_HOPS
+        value: '2'
