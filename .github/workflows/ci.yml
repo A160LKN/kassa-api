@@ -9,6 +9,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Токен GitHub в этом конвейере только читает код. Job, которым нужно больше (публикация отчётов
+# на GitHub Pages), просят права сами — так чужой код из зависимостей не сможет ничего изменить в репозитории
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Типы, линтер, тесты на PostgreSQL
